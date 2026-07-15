@@ -515,11 +515,16 @@ class MememageSaveRecord:
     @classmethod
     def INPUT_TYPES(cls):
         return {
-            "required": {"record": ("STRING", {"forceInput": True})},
+            # Both optional so `image` renders ABOVE `record`: ComfyUI puts every
+            # required input above every optional one, so a required `record` forces a
+            # crossed wire from Encode (whose image output sits above its record).
+            # run() no-ops cleanly when no record is wired, so nothing is lost.
             "optional": {
                 "image": ("IMAGE", {"tooltip": "Wire Encode's `image` output here to also save the "
                                                "barred image (lossless PNG). Optional — any saver "
                                                "works; the bar, not the file, carries identity."}),
+                "record": ("STRING", {"forceInput": True,
+                                      "tooltip": "Wire Encode's `record` output here — the record to save."}),
                 "subfolder": ("STRING", {"default": "",
                                          "tooltip": "Optional subfolder under the "
                                                     "output directory."}),
@@ -548,7 +553,7 @@ class MememageSaveRecord:
         import os
         return name if os.path.splitext(name)[1] else name + ext
 
-    def run(self, record, image=None, subfolder="", record_name="", image_name=""):
+    def run(self, record="", image=None, subfolder="", record_name="", image_name=""):
         import os
         data = _record_or_none(record)
         ident = data.get("identifier") if data else None
