@@ -1,0 +1,20 @@
+name: Publish to ComfyUI Registry
+
+# Publish a new version when you push a version tag (e.g. `git tag v0.2.0 && git push --tags`),
+# mirroring a PyPI release. Also runnable by hand from the Actions tab.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish to ComfyUI Registry
+        uses: Comfy-Org/publish-node-action@main
+        with:
+          # A registry API key, stored as a repo secret (Settings → Secrets → Actions).
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}

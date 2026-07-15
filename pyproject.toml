@@ -1,7 +1,9 @@
 [project]
-name = "mememage"
+# The ComfyUI-registry pack id (distinct from the core `mememage` PyPI library it
+# depends on). Users see the DisplayName ("Mememage") in ComfyUI Manager.
+name = "mememage-comfy"
 description = "Stamp a verifiable Mememage bar into generated images (and read it back) — the image carries a key to data you control, optionally its own ComfyUI prompt."
-version = "0.1.0"
+version = "0.3.0"
 license = { text = "MIT" }
 dependencies = ["mememage"]
 
@@ -9,7 +11,7 @@ dependencies = ["mememage"]
 Repository = "https://github.com/sememtac/mememage-comfy"
 
 # ComfyUI registry metadata (registry.comfy.org). PublisherId must match the
-# publisher account before `comfy node publish`.
+# publisher you create on the registry before `comfy node publish`.
 [tool.comfy]
 PublisherId = "catmemes"
 DisplayName = "Mememage"
