@@ -812,16 +812,25 @@ class MememageReserveId:
         return (ident,)
 
 
-class MememageLoadRecord:
-    """Read a saved record (.json) back from disk — the complement to Save Record.
+def _load_record_file(fp):
+    """(text, parsed-dict-or-None) for a record .json, or (None, None) if unreadable."""
+    try:
+        with open(fp, encoding="utf-8") as f:
+            text = f.read()
+        parsed = json.loads(text)
+    except (OSError, ValueError):
+        return (None, None)
+    return (text, parsed if isinstance(parsed, dict) else None)
 
-    Point at it by a full `path` (use the 📁 button), or give an `identifier` and it
-    finds the record **by content, not filename**: the identifier lives *inside* the
-    record, so a custom-named record is found just the same. It reads the folder
-    (`folder`, else `<output>/<subfolder>`) and returns the record whose `identifier`
-    field matches — trying the fast `<identifier>.json` name first, then scanning.
-    Wire the `record` output into Verify, or into a Preview / Unlock node to inspect
-    it; wire `identifier` into Encode to resume iterating a piece.
+
+class MememageLoadRecord:
+    """Load ONE record from a specific file — the complement to Save Record.
+
+    Point it at a record `.json` by full `path` (the 📁 button); it returns the record
+    text and its identifier. This is the by-**path** node — you have the exact file. To
+    find a record by its identifier in a folder (e.g. from a decoded image), use
+    **Mememage Find Record**; to fetch one over the network, **Mememage Fetch Record**.
+    Wire `record` into Verify / Unlock; wire `identifier` into Encode to resume a piece.
     """
 
     @classmethod
@@ -829,19 +838,9 @@ class MememageLoadRecord:
         return {
             "optional": {
                 "path": ("STRING", {"default": "",
-                                    "tooltip": "Full path to a record .json (overrides identifier). "
-                                               "Use the 📁 button."}),
-                "identifier": ("STRING", {"default": "",
-                                          "tooltip": "Find the record whose `identifier` field matches "
-                                                     "this — by content, so custom filenames work too. "
-                                                     "Wire Decode's identifier here (from a second "
-                                                     "Decode to avoid a loop)."}),
-                "subfolder": ("STRING", {"default": "",
-                                         "tooltip": "Subfolder under the output folder to search, if "
-                                                    "Save Record used one."}),
-                "folder": ("STRING", {"default": "",
-                                      "tooltip": "Folder to search for records (use the 📁 button). "
-                                                 "Blank = ComfyUI's output folder (+ subfolder)."}),
+                                    "tooltip": "Full path to a record .json — use the 📁 button. To "
+                                               "find one by identifier instead, use Mememage Find "
+                                               "Record."}),
             }
         }
 
@@ -849,38 +848,65 @@ class MememageLoadRecord:
     RETURN_NAMES = ("record", "identifier")
     FUNCTION = "run"
     CATEGORY = "Mememage/Records"
-    DESCRIPTION = ("Read a saved record back from disk — by path, or by identifier matched against "
-                   "each record's `identifier` field (filename-independent). Wire `identifier` into "
-                   "Encode to resume a piece; wire `record` into Verify / Unlock.")
+    DESCRIPTION = ("Load one record .json by path. To find a record by identifier, use Mememage Find "
+                   "Record; to fetch one over the network, Mememage Fetch Record.")
 
-    @staticmethod
-    def _read_json(fp):
-        """(text, parsed-dict-or-None) for a file, or (None, None) if unreadable."""
-        try:
-            with open(fp, encoding="utf-8") as f:
-                text = f.read()
-            parsed = json.loads(text)
-        except (OSError, ValueError):
-            return (None, None)
-        return (text, parsed if isinstance(parsed, dict) else None)
+    def run(self, path=""):
+        import os
+        fp = (path or "").strip()
+        if not fp:
+            return ("", "")                            # nothing pointed at yet
+        if not os.path.exists(fp):
+            return ("", "")                            # not here — may live elsewhere; graceful
+        text, parsed = _load_record_file(fp)
+        if text is None:
+            raise ValueError(f"Mememage Load Record: {fp!r} is missing or not valid JSON.")
+        return (text, parsed.get("identifier", "") if parsed else "")
 
-    def run(self, path="", identifier="", subfolder="", folder=""):
+
+class MememageFindRecord:
+    """Find a record on disk **by its identifier** — the local resolver.
+
+    Give it an `identifier` (wire Decode's) and a `folder`; it returns the record whose
+    `identifier` field matches — **by content, not filename**, so a custom-named record
+    is found just the same. It tries the fast `<identifier>.json` name first, then scans
+    the folder (newest wins on ties). This is the local twin of **Mememage Fetch Record**
+    (same lookup, over the network); to load one exact file, use **Mememage Load Record**.
+    `found` is False (and `record` empty) when no match is here — never a crash. Wire
+    `record` into Verify / Unlock; `found` into a Switch to branch on it.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "optional": {
+                "identifier": ("STRING", {"default": "",
+                                          "tooltip": "The record to find — its `identifier` field must "
+                                                     "match. Wire Decode's identifier here."}),
+                "folder": ("STRING", {"default": "",
+                                      "tooltip": "Folder to search (use the 📁 button). Blank = "
+                                                 "ComfyUI's output folder (+ subfolder)."}),
+                "subfolder": ("STRING", {"default": "",
+                                         "tooltip": "Subfolder under the output folder, if Save Record "
+                                                    "used one. Ignored when `folder` is set."}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "STRING", "BOOLEAN")
+    RETURN_NAMES = ("record", "identifier", "found")
+    FUNCTION = "run"
+    CATEGORY = "Mememage/Records"
+    DESCRIPTION = ("Find a record on disk by identifier (matched against each record's `identifier` "
+                   "field, filename-independent) — the local twin of Fetch Record. Wire `record` into "
+                   "Verify; `found` reports whether it was there.")
+
+    def run(self, identifier="", folder="", subfolder=""):
         import os, glob
-        # 1) explicit path — an exact file the user pointed at; corrupt IS a real error here
-        if path and path.strip():
-            fp = path.strip()
-            if not os.path.exists(fp):
-                return ("", "")                        # not here — it may live elsewhere; graceful
-            text, parsed = self._read_json(fp)
-            if text is None:
-                raise ValueError(f"Mememage Load Record: {fp!r} is missing or not valid JSON.")
-            return (text, parsed.get("identifier", "") if parsed else "")
-
         ident = (identifier or "").strip()
         if not ident:
-            return ("", "")                            # nothing to look up (e.g. an image with no bar)
+            return ("", "", False)                     # nothing to look up (e.g. an image with no bar)
 
-        # 2) search root: explicit folder, else the output folder (+ subfolder)
+        # search root: explicit folder, else the output folder (+ subfolder)
         if folder and folder.strip():
             root = folder.strip()
         else:
@@ -888,26 +914,26 @@ class MememageLoadRecord:
             if subfolder and subfolder.strip():
                 root = os.path.join(root, subfolder.strip())
         if not os.path.isdir(root):
-            return ("", "")
+            return ("", ident, False)
 
-        # 3) fast path: <root>/<ident>.json whose *content* identifier matches
+        # fast path: <root>/<ident>.json whose *content* identifier matches
         direct = os.path.join(root, f"{ident}.json")
         if os.path.exists(direct):
-            text, parsed = self._read_json(direct)
+            text, parsed = _load_record_file(direct)
             if parsed is not None and parsed.get("identifier") == ident:
-                return (text, ident)                   # named by identifier (the common case) — done
+                return (text, ident, True)             # named by identifier (the common case) — done
 
-        # 4) content scan: any *.json here whose `identifier` field matches; newest wins on ties
-        best = None                                    # (mtime, text)
+        # content scan: any *.json here whose `identifier` field matches; newest wins on ties
+        best = None
         for fp in glob.glob(os.path.join(root, "*.json")):
-            text, parsed = self._read_json(fp)         # skip unrelated/corrupt files silently
+            text, parsed = _load_record_file(fp)       # skip unrelated/corrupt files silently
             if parsed is not None and parsed.get("identifier") == ident:
                 mt = os.path.getmtime(fp)
                 if best is None or mt > best[0]:
                     best = (mt, text)
         if best is not None:
-            return (best[1], ident)
-        return ("", "")                                # no record with that identifier here
+            return (best[1], ident, True)
+        return ("", ident, False)                      # no record with that identifier here
 
 
 # The reference decoder's surface-fetch contract (docs/js/ui.js:fetchFromSource):
@@ -1259,10 +1285,8 @@ class MememageVerify:
                                           "tooltip": "Path to an image file (use the 📁 button). "
                                                      "Ignored if an image is wired in."}),
                 "record": ("STRING", {"forceInput": True,
-                                      "tooltip": "Wire a record (e.g. from Load Record). Takes "
-                                                 "priority over record_path."}),
-                "record_path": ("STRING", {"default": "",
-                                           "tooltip": "Path to the record .json (use the 📁 button)."}),
+                                      "tooltip": "Wire a record in — from Mememage Load / Find / "
+                                                 "Fetch Record, or Encode."}),
             }
         }
 
@@ -1273,7 +1297,7 @@ class MememageVerify:
     DESCRIPTION = ("Verify an image against its record and report a plain-language verdict "
                    "(VERIFIED / ALTERED / NO BAR). Integrity by hash — the WITNESSED check.")
 
-    def run(self, image=None, image_path="", record=None, record_path=""):
+    def run(self, image=None, image_path="", record=None):
         import mememage
         np, torch, Image = _deps()
 
@@ -1290,12 +1314,6 @@ class MememageVerify:
             raise ValueError("Mememage Verify: wire an image or pick an image_path.")
 
         rec = _record_or_none(record)                # tolerant of blank / non-JSON / placeholders
-        if rec is None and record_path and record_path.strip():
-            try:
-                with open(record_path.strip(), encoding="utf-8") as f:
-                    rec = _record_or_none(f.read())
-            except OSError:
-                rec = None                           # missing/unreadable record file -> NO RECORD, not a crash
 
         bar = mememage.decode(pil)
         if bar is None:
@@ -1304,7 +1322,7 @@ class MememageVerify:
         identifier = bar.identifier
         if rec is None:
             return (f"NO RECORD — the bar reads {identifier}, but no record was given to check it "
-                    f"against. Provide a record (wire one or pick record_path).", False, identifier, img_out)
+                    f"against. Wire a record in — from Load / Find / Fetch Record.", False, identifier, img_out)
         matched = bool(mememage.verify(pil, rec))
         if matched:
             verdict = (f"VERIFIED — the record matches this image by hash; the data is intact and "
@@ -1392,6 +1410,7 @@ NODE_CLASS_MAPPINGS = {
     "MememageFieldList": MememageFieldList,
     "MememageDecode": MememageDecode,
     "MememageLoadRecord": MememageLoadRecord,
+    "MememageFindRecord": MememageFindRecord,
     "MememageFetchRecord": MememageFetchRecord,
     "MememageUnlock": MememageUnlock,
     "MememageExtractWorkflow": MememageExtractWorkflow,
@@ -1408,6 +1427,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MememageFieldList": "Mememage Fields",          # friendly name — "the node your fields go into"
     "MememageDecode": "Mememage Decode",
     "MememageLoadRecord": "Mememage Load Record",
+    "MememageFindRecord": "Mememage Find Record",
     "MememageFetchRecord": "Mememage Fetch Record",
     "MememageUnlock": "Mememage Unlock",
     "MememageExtractWorkflow": "Mememage Extract Workflow",

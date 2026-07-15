@@ -456,24 +456,12 @@ class TestLoadRecord(unittest.TestCase):
             self.assertEqual(json.loads(record)["Creator"], "Catmemes")
             self.assertEqual(ident, "mememage-abcdef0123456789")   # chains into Encode.identifier
 
-    def test_reads_by_identifier_from_output_dir(self):
-        import tempfile, os
-        from unittest.mock import patch
-        rec = '{"identifier": "mememage-abcdef0123456789"}'
-        with tempfile.TemporaryDirectory() as tmp:
-            with open(os.path.join(tmp, "mememage-abcdef0123456789.json"), "w") as f:
-                f.write(rec)
-            with patch.object(nodes, "_comfy_output_dir", return_value=tmp):
-                record, ident = nodes.MememageLoadRecord().run(identifier="mememage-abcdef0123456789")
-        self.assertEqual(record, rec)
-        self.assertEqual(ident, "mememage-abcdef0123456789")
-
     def test_missing_file_is_empty_not_crash(self):
-        # no record where we looked -> ("", "") (it may live elsewhere), not an error
+        # not where we looked -> ("", "") (it may live elsewhere), not an error
         self.assertEqual(nodes.MememageLoadRecord().run(path="/nope/does-not-exist.json"), ("", ""))
 
     def test_nothing_given_is_empty(self):
-        # e.g. an image with no bar -> empty identifier -> nothing to load -> graceful
+        # no path yet -> graceful empty
         self.assertEqual(nodes.MememageLoadRecord().run(), ("", ""))
 
     def test_present_but_corrupt_still_raises(self):
@@ -485,6 +473,24 @@ class TestLoadRecord(unittest.TestCase):
             with self.assertRaises(ValueError):        # a real, present-but-broken file IS surfaced
                 nodes.MememageLoadRecord().run(path=p)
 
+
+class TestFindRecord(unittest.TestCase):
+    def test_finds_by_identifier_in_output_dir(self):
+        import tempfile, os
+        from unittest.mock import patch
+        rec = '{"identifier": "mememage-abcdef0123456789"}'
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "mememage-abcdef0123456789.json"), "w") as f:
+                f.write(rec)
+            with patch.object(nodes, "_comfy_output_dir", return_value=tmp):
+                record, ident, found = nodes.MememageFindRecord().run(identifier="mememage-abcdef0123456789")
+        self.assertEqual(record, rec)
+        self.assertEqual(ident, "mememage-abcdef0123456789")
+        self.assertTrue(found)
+
+    def test_nothing_given_is_empty_not_found(self):
+        self.assertEqual(nodes.MememageFindRecord().run(), ("", "", False))
+
     def test_finds_custom_named_record_by_content(self):
         # the identifier lives INSIDE the record, so a custom filename is found by scanning
         import tempfile, os
@@ -494,12 +500,11 @@ class TestLoadRecord(unittest.TestCase):
             with open(os.path.join(tmp, "dawn_lake.json"), "w") as f:   # NOT named by identifier
                 f.write(rec)
             with patch.object(nodes, "_comfy_output_dir", return_value=tmp):
-                record, ident = nodes.MememageLoadRecord().run(identifier="mememage-abcdef0123456789")
+                record, ident, found = nodes.MememageFindRecord().run(identifier="mememage-abcdef0123456789")
         self.assertEqual(json.loads(record)["Creator"], "Cat")
-        self.assertEqual(ident, "mememage-abcdef0123456789")
+        self.assertTrue(found)
 
     def test_scan_ignores_non_matching_and_corrupt(self):
-        # other records + junk files in the folder don't confuse or crash the content scan
         import tempfile, os
         from unittest.mock import patch
         want = '{"identifier": "mememage-1111111111111111", "k": "want"}'
@@ -511,8 +516,9 @@ class TestLoadRecord(unittest.TestCase):
             with open(os.path.join(tmp, "c.json"), "w") as f:
                 f.write(want)
             with patch.object(nodes, "_comfy_output_dir", return_value=tmp):
-                record, ident = nodes.MememageLoadRecord().run(identifier="mememage-1111111111111111")
+                record, ident, found = nodes.MememageFindRecord().run(identifier="mememage-1111111111111111")
         self.assertEqual(json.loads(record)["k"], "want")
+        self.assertTrue(found)
 
     def test_custom_folder_search_root(self):
         import tempfile, os
@@ -520,10 +526,10 @@ class TestLoadRecord(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with open(os.path.join(tmp, "whatever.json"), "w") as f:
                 f.write(rec)
-            record, ident = nodes.MememageLoadRecord().run(
+            record, ident, found = nodes.MememageFindRecord().run(
                 identifier="mememage-abcdef0123456789", folder=tmp)     # scan an explicit dir
         self.assertEqual(record, rec)
-        self.assertEqual(ident, "mememage-abcdef0123456789")
+        self.assertTrue(found)
 
     def test_no_matching_identifier_in_folder_is_empty(self):
         import tempfile, os
@@ -532,11 +538,10 @@ class TestLoadRecord(unittest.TestCase):
             with open(os.path.join(tmp, "x.json"), "w") as f:
                 f.write('{"identifier": "mememage-9999999999999999"}')
             with patch.object(nodes, "_comfy_output_dir", return_value=tmp):
-                out = nodes.MememageLoadRecord().run(identifier="mememage-0000000000000000")
-        self.assertEqual(out, ("", ""))
+                out = nodes.MememageFindRecord().run(identifier="mememage-0000000000000000")
+        self.assertEqual(out, ("", "mememage-0000000000000000", False))
 
 
-@unittest.skipUnless(_has_torch(), "torch required (ComfyUI runtime)")
 class TestVerify(unittest.TestCase):
     def _make(self):
         import torch, mememage

@@ -106,7 +106,7 @@ reference decoder's password box) reveals them. Needs the crypto library:
   reunites a body and its soul by math (the identifier + content hash live in the
   pixels), so the two files needn't share a name, or any particular name.
   `record_name` and `image_name` both default to the record's **`<identifier>`** —
-  the one default that lets **Load Record by identifier** find the record with no
+  the one default that lets **Find Record** locate the record by identifier with no
   path *and* gives a tidy pair that overwrites in place as you iterate a pinned
   piece. Override either freely (a bare stem gets `.json`/`.png` added; a name with
   its own extension is used as-is). When a name isn't `<identifier>`, load/verify it
@@ -158,13 +158,13 @@ reference decoder's password box) reveals them. Needs the crypto library:
   so a field's value can come from elsewhere in the graph. Same smart-typing; a
   blank key passes `base` through; a repeated key overrides upstream.
 
-**Mememage Verify** — `(image / image_path, record / record_path) → verdict, matched, identifier, image`
-- **The headline check, in one node.** Drop an image and its `.json` record (📁
-  pickers), or wire an image you just generated, and get a plain-language
-  **`verdict`**: `VERIFIED — record matches, untampered` / `ALTERED — record doesn't
-  match` / `NO BAR`. Folds Load Record + the verify step together. This is the
+**Mememage Verify** — `(image / image_path, record) → verdict, matched, identifier, image`
+- **The headline check.** Wire an image (or pick an image file) and a **record** (from
+  Load / Find / Fetch Record), and get a plain-language **`verdict`**: `VERIFIED —
+  record matches, untampered` / `ALTERED — record doesn't match` / `NO BAR`. This is the
   integrity (by-hash) check — the **WITNESSED** badge. Signature (AUTHENTICATED) and
   portrait (EMBODIED) checks live in the decoder web app; this verifies by hash.
+  *(Record loading lives in the Load / Find / Fetch Record nodes — Verify just verifies.)*
 
 **Mememage Decode** — `IMAGE → identifier, content_hash, image`
 - The low-level reader: pulls the bar's **identifier** and **content hash** out of an
@@ -178,19 +178,24 @@ reference decoder's password box) reveals them. Needs the crypto library:
   Encode's `identifier` so every conceive overwrites the same record. Paste an existing
   identifier to resume a piece. See **Iterating one piece** above.
 
-**Mememage Load Record** — `→ record, identifier`
-- The complement to Save Record: read a saved `.json` back from disk, by full
-  `path` (📁 button) or by `identifier`.
-- **By identifier means by content, not filename.** The identifier lives *inside*
-  the record, so Load Record finds it whatever the file is named: it tries the fast
-  `<identifier>.json` name first, then **scans the folder** and returns the record
-  whose `identifier` field matches (newest wins on ties). So a custom-named record
-  (`dawn_soul.json`) is found just the same — which is what lets Save Record name
-  files freely. Set `folder` (📁 button) to search somewhere other than the output
-  folder; `subfolder` narrows within it.
-- Outputs the `record` (wire into **Verify** / **Unlock** / a Preview) and its
-  `identifier` (wire into **Encode**'s `identifier` to resume iterating that piece —
-  the decode-an-image → find-its-record → keep-updating-it flow).
+**Mememage Load Record** — `path → record, identifier`
+- The complement to Save Record: read **one** saved `.json` back from disk by full
+  `path` (📁 button) — you have the exact file. Outputs the `record` (wire into
+  **Verify** / **Unlock** / a Preview) and its `identifier` (wire into **Encode** to
+  resume iterating that piece). To find a record *by its identifier* instead, use
+  **Find Record**; over the network, **Fetch Record**.
+
+**Mememage Find Record** — `(identifier, folder, subfolder) → record, identifier, found`
+- **Find a record on disk by its identifier — the local resolver.** Give it an
+  `identifier` (wire Decode's) and a `folder`, and it returns the record whose
+  `identifier` field matches — **by content, not filename**. It tries the fast
+  `<identifier>.json` name first, then **scans the folder** (newest wins on ties), so a
+  custom-named record (`dawn_soul.json`) is found just the same — which is what lets
+  Save Record name files freely. `found` is `False` (and `record` empty) when nothing
+  matches — wire it into a Switch to branch. Blank `folder` = ComfyUI's output folder
+  (+ `subfolder`).
+- This is the **local twin of Fetch Record** (same lookup, over the network), and the
+  star of the decode→verify flow: **`Decode.identifier → Find Record → Verify`**.
 
 **Mememage Fetch Record** — `→ record, identifier, found, url`
 - The **network** twin of Load Record — the "By Word" path. Load Record reads local
