@@ -99,10 +99,9 @@ app.registerExtension({
 const PICK_TARGETS = {
   MememageEncode: [{ widget: "password_file", label: "📁 pick password file" }],
   MememageUnlock: [{ widget: "password_file", label: "📁 pick password file" }],
-  MememageLoadRecord: [{ widget: "path", label: "📁 pick record .json" },
-                       { widget: "folder", label: "📁 pick records folder", dir: true }],
-  MememageVerify: [{ widget: "image_path", label: "📁 pick image" },
-                   { widget: "record_path", label: "📁 pick record .json" }],
+  MememageLoadRecord: [{ widget: "path", label: "📁 pick record .json" }],
+  MememageFindRecord: [{ widget: "folder", label: "📁 pick records folder", dir: true }],
+  MememageVerify: [{ widget: "image_path", label: "📁 pick image" }],
 };
 // Extract Workflow: capture the embedded graph on execute, then let the user
 // download it to a .json file (non-destructive — never touches the canvas). The
