@@ -1,0 +1,29 @@
+name: Tests
+
+# Runs the node test suite on every push to main and every PR, so a broken
+# change can't be tagged for the registry. Publishing lives in publish.yml
+# (tags only), so the two never overlap.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps (CPU torch + numpy + the mememage core)
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch keeps the install lean; the nodes only need it for
+          # the IMAGE tensor round-trip, no GPU.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy -r requirements.txt
+      - name: Run the node test suite
+        run: python test_nodes.py
