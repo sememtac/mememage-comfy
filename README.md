@@ -25,10 +25,13 @@ untouched). With one click, the bar can also point the image back at the
   fields** below.
 - `private` — comma-separated top-level field names to encrypt; empty + a
   password = encrypt everything.
+- `use_identifier` *(default on)* — honor the `identifier` below. Turn it **off** to
+  ignore the identifier (content-address as usual) *without disconnecting the wire* —
+  handy when a Reserve ID is wired in but you want a fresh identity for this one run.
 - `identifier` — pin a reserved identifier (from **Mememage Reserve ID**, or paste a
   `<prefix>-<16 hex>`) to keep iterating **one** piece: each conceive overwrites the
-  same record. Empty = content-addressed (a fresh identity per change). See
-  **Iterating one piece** below.
+  same record. Honored only when `use_identifier` is on. Empty = content-addressed
+  (a fresh identity per change). See **Iterating one piece** below.
 - Outputs the **barred image** (wire it into Save Image), the **identifier**, and
   the **record** JSON (store it wherever you keep your data).
 
@@ -122,13 +125,20 @@ reference decoder's password box) reveals them. Needs the crypto library:
   metadata; the settings live in the graph, which this node reads directly. It
   promotes the ones you toggle on into a clean **`generation`** field. Each param
   has its own on/off switch (all default on): **model, positive_prompt,
-  negative_prompt, seed, steps, cfg, sampler, scheduler, denoise, loras** — so you
-  emit exactly what you want. Wire it into a Mememage Fields node or into Encode.
+  negative_prompt, seed, steps, cfg, guidance, sampler, scheduler, denoise, loras** —
+  so you emit exactly what you want. Wire it into a Mememage Fields node or into Encode.
+  (`cfg` and `guidance` are separate tags — a Flux guidance isn't a cfg.)
 
-  The toggles are exact — an off param is never produced. *Finding* each value is
-  best-effort over the standard SD/SDXL nodes; a custom sampler or exotic graph may
-  leave a toggled-on param blank. *(Encode's `embed_workflow` still stores the
-  entire graph as `comfy_prompt` regardless — this is the tidy, curated summary.)*
+  **How it finds them — think of it as EXIF for your render.** Rather than hunting for
+  specific node *types* (which multiply endlessly), it harvests a fixed vocabulary of
+  input *names* (`seed`/`noise_seed`, `steps`, `cfg`/`guidance`, `sampler_name`, …)
+  onto those tags — so it maps the same whether you use **KSampler** or a **Flux
+  custom-sampling** stack, and future samplers work for free. It follows wired values
+  back to their literal (a seed driven from a primitive is captured, not blanked) and
+  traces the conditioning graph for the prompt. Toggles are exact — an off param is
+  never produced — and it **never guesses**: a param it can't confidently read is
+  simply absent. *(Encode's `embed_workflow` still stores the entire graph as
+  `comfy_prompt` regardless — this is the tidy, curated summary of it.)*
 
 **Mememage Fields** — `(field_1…field_N, base) → fields`
 - **Where your fields come together.** It holds no data itself — each field is
@@ -238,20 +248,21 @@ Drag either onto the ComfyUI canvas (or paste it with Ctrl+V) to populate the gr
 
 ## Install
 
+**ComfyUI Manager (recommended).** Search **"Mememage"** in the Manager and click
+**Install** — it pulls the node and its `mememage` dependency (from `requirements.txt`)
+for you. Or use **Install via Git URL** with `https://github.com/sememtac/mememage-comfy`.
+Restart ComfyUI.
+
+**Manual (git).**
+
 ```bash
 cd ComfyUI/custom_nodes
 git clone https://github.com/sememtac/mememage-comfy
-```
-
-Then install the `mememage` core into **ComfyUI's** Python — the same interpreter
-ComfyUI runs (ComfyUI Manager does this for you from `requirements.txt`):
-
-```bash
+# then install the core into ComfyUI's OWN python:
 <ComfyUI-python> -m pip install mememage
 ```
 
-Restart ComfyUI — the nodes appear under the **Mememage** category. (ComfyUI
-Manager / the registry will handle this automatically once published.)
+Restart ComfyUI — the nodes appear under the **Mememage** category.
 
 ## Test
 
@@ -261,6 +272,9 @@ Manager / the registry will handle this automatically once published.)
 python test_nodes.py            # structure checks always; the encode→decode
                                 # round-trip runs when torch is available
 ```
+
+CI (`.github/workflows/test.yml`) runs the full suite on every push and PR — so a
+broken change can't be tagged for the registry.
 
 ## What's in the bar
 
@@ -277,7 +291,7 @@ Distributed through the **ComfyUI Registry** → **ComfyUI Manager** (one-click 
 for users). It's the same rhythm as a PyPI release: bump the version, publish, users
 see an update in Manager.
 
-**One-time setup** (like creating a PyPI account):
+**One-time setup** — *done* (kept here for reference / re-setup):
 1. Sign in at **registry.comfy.org** with GitHub.
 2. Create a **publisher** whose id matches `PublisherId` in `pyproject.toml` (`catmemes`).
 3. Generate an **API key** for that publisher.
@@ -285,7 +299,8 @@ see an update in Manager.
    **`REGISTRY_ACCESS_TOKEN`** (Settings → Secrets and variables → Actions).
 
 **Each release:**
-- Bump `version` in `pyproject.toml`, commit, then `git tag vX.Y.Z && git push --tags`.
+- Bump `version` in `pyproject.toml`, commit (CI's `test.yml` runs the suite on the
+  push), then `git tag vX.Y.Z && git push --tags`.
 - The `.github/workflows/publish.yml` action runs `comfy node publish` for you.
 - (Manual alternative: `pip install comfy-cli`, then `comfy node publish` from this folder.)
 
