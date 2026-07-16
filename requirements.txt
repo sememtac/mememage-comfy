@@ -1,1 +1,1 @@
-mememage>=0.1.2
+mememage>=0.1.6

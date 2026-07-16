@@ -163,10 +163,15 @@ reference decoder's password box) reveals them. Needs the crypto library:
 **Mememage Verify** — `(image / image_path, record) → verdict, matched, identifier, image`
 - **The headline check.** Wire an image (or pick an image file) and a **record** (from
   Load / Find / Fetch Record), and get a plain-language **`verdict`**: `VERIFIED —
-  record matches, untampered` / `ALTERED — record doesn't match` / `NO BAR`. This is the
-  integrity (by-hash) check — the **WITNESSED** badge. Signature (AUTHENTICATED) and
-  portrait (EMBODIED) checks live in the decoder web app; this verifies by hash.
+  record matches, untampered` / `ALTERED — record doesn't match` / `UNSUPPORTED` / `NO BAR`.
+  This is the integrity (by-hash) check — the **WITNESSED** badge. Signature (AUTHENTICATED)
+  and portrait (EMBODIED) checks live in the decoder web app; this verifies by hash.
   *(Record loading lives in the Load / Find / Fetch Record nodes — Verify just verifies.)*
+- **UNSUPPORTED ≠ ALTERED.** A record whose `hash_version` is an application-defined model
+  (e.g. an image from the canonical chain at **souls.mememage.art**, which uses a curated
+  V1 inclusion set) can't be verified by this core build — it says **UNSUPPORTED**, not
+  ALTERED. The record isn't tampered; core just doesn't implement that hash model. Verify it
+  in the application that defines the version (its own web decoder).
 
 **Mememage Decode** — `IMAGE → identifier, content_hash, image`
 - The low-level reader: pulls the bar's **identifier** and **content hash** out of an

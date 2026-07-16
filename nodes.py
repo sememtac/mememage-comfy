@@ -1308,7 +1308,9 @@ class MememageVerify:
     FUNCTION = "run"
     CATEGORY = "Mememage"
     DESCRIPTION = ("Verify an image against its record and report a plain-language verdict "
-                   "(VERIFIED / ALTERED / NO BAR). Integrity by hash — the WITNESSED check.")
+                   "(VERIFIED / ALTERED / UNSUPPORTED / NO BAR). Integrity by hash — the WITNESSED "
+                   "check. UNSUPPORTED = the record's hash_version is an app-defined model core "
+                   "doesn't implement (not tampered — verify it in that app's decoder).")
 
     def run(self, image=None, image_path="", record=None):
         import mememage
@@ -1336,10 +1338,19 @@ class MememageVerify:
         if rec is None:
             return (f"NO RECORD — the bar reads {identifier}, but no record was given to check it "
                     f"against. Wire a record in — from Load / Find / Fetch Record.", False, identifier, img_out)
-        matched = bool(mememage.verify(pil, rec))
+        v = mememage.verify(pil, rec)
+        matched = bool(v)
         if matched:
             verdict = (f"VERIFIED — the record matches this image by hash; the data is intact and "
                        f"belongs to it. ({identifier})")
+        elif not getattr(v, "supported", True):
+            # The record declares a hash_version core doesn't implement (an app-defined
+            # model, e.g. the canonical chain's V1). Not tampered — core just can't judge it.
+            hv = rec.get("hash_version", "?")
+            verdict = (f"UNSUPPORTED — this record uses hash_version {hv!r}, a hash model this "
+                       f"mememage core build doesn't implement, so it can't be verified here. "
+                       f"Verify it with the application that defines this version (e.g. its web "
+                       f"decoder at souls.mememage.art). This is NOT tamper evidence. ({identifier})")
         else:
             verdict = (f"ALTERED — the record does NOT match this image (tampered data, or the wrong "
                        f"record for it). ({identifier})")

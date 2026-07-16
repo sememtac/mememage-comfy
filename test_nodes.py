@@ -581,6 +581,19 @@ class TestVerify(unittest.TestCase):
         self.assertTrue(verdict.startswith("NO BAR"))
         self.assertEqual(identifier, "")
 
+    def test_unsupported_hash_version(self):
+        # a record from an app-defined hash model (e.g. the canonical chain's V1)
+        # reads UNSUPPORTED, never ALTERED — core can't judge it, but it's not tampered
+        import json as _json
+        barred, ident, record = self._make()
+        app = _json.loads(record); app["hash_version"] = 1
+        verdict, matched, identifier, _ = nodes.MememageVerify().run(
+            image=barred, record=_json.dumps(app))
+        self.assertFalse(matched)
+        self.assertTrue(verdict.startswith("UNSUPPORTED"))
+        self.assertNotIn("ALTERED", verdict)
+        self.assertEqual(identifier, ident)
+
     def test_no_record(self):
         barred, ident, _ = self._make()
         verdict, matched, identifier, _ = nodes.MememageVerify().run(image=barred)  # no record
