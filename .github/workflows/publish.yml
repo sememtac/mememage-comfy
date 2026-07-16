@@ -2,6 +2,12 @@ name: Publish to ComfyUI Registry
 
 # Publish a new version when you push a version tag (e.g. `git tag v0.2.0 && git push --tags`),
 # mirroring a PyPI release. Also runnable by hand from the Actions tab.
+#
+# The registry's per-version "Updates" changelog is filled from the matching GitHub
+# Release's body — no second place to write notes. comfy-cli's `comfy node publish`
+# reads COMFY_NODE_CHANGELOG when no --changelog flag is passed (the publish action
+# passes none), so exporting that env from the release notes flows straight through.
+# No release for the tag (a bare `git push --tags`) → empty → same as before.
 on:
   push:
     tags:
@@ -13,6 +19,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Load release notes into COMFY_NODE_CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json body -q .body 2>/dev/null || true)"
+          # Multiline-safe: heredoc into $GITHUB_ENV so the composite publish action
+          # (and its `comfy node publish`) inherit it. Unique delimiter avoids clashes.
+          {
+            echo "COMFY_NODE_CHANGELOG<<__COMFY_CHANGELOG_EOF__"
+            printf '%s\n' "$notes"
+            echo "__COMFY_CHANGELOG_EOF__"
+          } >> "$GITHUB_ENV"
       - name: Publish to ComfyUI Registry
         uses: Comfy-Org/publish-node-action@main
         with:
