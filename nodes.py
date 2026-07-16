@@ -965,22 +965,54 @@ def _surface_candidates(base, identifier, content_hash=""):
     return [expanded + n for n in names]
 
 
+_SSL_CTX = None
+
+
+def _https_context():
+    """A TLS context that validates against certifi's current CA bundle.
+
+    Python on Windows validates HTTPS against the *Windows* certificate store,
+    which on a fresh / un-updated machine is often stale — a perfectly valid
+    Let's Encrypt cert then fails as "certificate has expired" because OpenSSL
+    path-builds through an old expired root. certifi ships Mozilla's current
+    roots (and rides in with `requests`, so it's present in virtually every
+    ComfyUI env), sidestepping the OS store entirely — no env var, no terminal.
+    Falls back to default verification if certifi somehow isn't installed.
+    Cached: the context is built once and reused."""
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        import ssl
+        try:
+            import certifi
+            _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            _SSL_CTX = False                           # sentinel: use the default context
+    return _SSL_CTX or None
+
+
 def _http_get_text(url, timeout, headers=None):
     """GET a URL and return its body text, or None on any non-200 / network failure.
     Adds a cache-buster so a stale listing or record is never served."""
-    import urllib.request
+    import urllib.request, urllib.error
     h = {"Cache-Control": "no-store"}
     if headers:
         h.update(headers)
     sep = "&" if "?" in url else "?"
     try:
         req = urllib.request.Request(f"{url}{sep}t=0", headers=h)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_https_context()) as resp:
             if getattr(resp, "status", 200) != 200:
                 return None
             return resp.read().decode("utf-8", "replace")
-    except Exception:
-        return None                                    # 404 / CORS / timeout / offline
+    except urllib.error.HTTPError as e:
+        if e.code != 404:                              # 404 is expected while probing candidates
+            print(f"[Mememage] fetch: {url} -> HTTP {e.code}")
+        return None
+    except Exception as e:
+        # Surface the real reason (SSL / timeout / connection) instead of a silent
+        # empty result — a hidden 'certificate has expired' is hours of blind chasing.
+        print(f"[Mememage] fetch: {url} -> {type(e).__name__}: {e}")
+        return None
 
 
 def _fetch_record_at(url, timeout):

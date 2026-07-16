@@ -1,1 +1,4 @@
 mememage>=0.1.6
+# certifi: validate HTTPS against Mozilla's current roots instead of a possibly
+# stale Windows cert store (which fails valid Let's Encrypt certs as "expired").
+certifi

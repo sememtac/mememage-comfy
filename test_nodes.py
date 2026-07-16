@@ -943,7 +943,7 @@ class TestFetchRecord(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        def fake(req, timeout=None):
+        def fake(req, timeout=None, context=None):     # context= added by _http_get_text
             url = req.full_url
             for suf in ("?t=0", "&t=0"):               # strip only the cache-buster we appended
                 if url.endswith(suf):
@@ -967,6 +967,15 @@ class TestFetchRecord(unittest.TestCase):
     def test_trailing_slash_added(self):
         cands = nodes._surface_candidates("https://souls.example.com", "mememage-1111111111111111")
         self.assertTrue(cands[0].startswith("https://souls.example.com/mememage-1111111111111111.soul"))
+
+    def test_https_context_uses_certifi(self):
+        # HTTPS must validate against certifi's current roots, not the (possibly
+        # stale) OS store — that's what fixes "certificate has expired" on fresh
+        # Windows machines with no user action. certifi is a pinned dependency.
+        import ssl
+        ctx = nodes._https_context()
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)   # never turns verification off
 
     def test_fetches_first_answering_variant(self):
         from unittest.mock import patch
