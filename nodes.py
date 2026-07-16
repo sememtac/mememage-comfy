@@ -852,6 +852,12 @@ class MememageLoadRecord:
     DESCRIPTION = ("Load one record .json by path. To find a record by identifier, use Mememage Find "
                    "Record; to fetch one over the network, Mememage Fetch Record.")
 
+    @classmethod
+    def IS_CHANGED(cls, *args, **kwargs):
+        # Reads from disk (untracked by ComfyUI) — always re-read so an edited or
+        # newly-saved file isn't hidden behind a stale cache.
+        return float("nan")
+
     def run(self, path=""):
         import os
         fp = (path or "").strip()
@@ -900,6 +906,12 @@ class MememageFindRecord:
     DESCRIPTION = ("Find a record on disk by identifier (matched against each record's `identifier` "
                    "field, filename-independent) — the local twin of Fetch Record. Wire `record` into "
                    "Verify; `found` reports whether it was there.")
+
+    @classmethod
+    def IS_CHANGED(cls, *args, **kwargs):
+        # Scans a folder on disk (untracked by ComfyUI) — always re-scan so a
+        # record saved earlier in the same run, or any folder change, is seen.
+        return float("nan")
 
     def run(self, identifier="", folder="", subfolder=""):
         import os, glob

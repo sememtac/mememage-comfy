@@ -541,6 +541,13 @@ class TestFindRecord(unittest.TestCase):
                 out = nodes.MememageFindRecord().run(identifier="mememage-0000000000000000")
         self.assertEqual(out, ("", "mememage-0000000000000000", False))
 
+    def test_disk_reads_never_cached(self):
+        import math
+        # both read disk (untracked by ComfyUI) -> must force re-run, or a record
+        # saved earlier in the same run is hidden behind a stale cache
+        self.assertTrue(math.isnan(nodes.MememageFindRecord.IS_CHANGED()))
+        self.assertTrue(math.isnan(nodes.MememageLoadRecord.IS_CHANGED()))
+
 
 class TestVerify(unittest.TestCase):
     def _make(self):
