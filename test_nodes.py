@@ -697,12 +697,13 @@ class TestPinnedIdentifier(unittest.TestCase):
         import torch
         pin = "mememage-1a2b3c4d5e6f7a8b"
         # two different images / fields, same pinned identifier = same pointer
+        # (use_identifier opt-in — pinning is deliberate, not the default)
         _, id1, rec1 = nodes.MememageEncode().run(
             torch.full((1, 512, 512, 3), 0.4), fields_json='{"v": 1}',
-            identifier=pin, embed_workflow=False)
+            identifier=pin, use_identifier=True, embed_workflow=False)
         _, id2, rec2 = nodes.MememageEncode().run(
             torch.full((1, 512, 512, 3), 0.6), fields_json='{"v": 2}',
-            identifier=pin, embed_workflow=False)
+            identifier=pin, use_identifier=True, embed_workflow=False)
         self.assertEqual(id1, pin)
         self.assertEqual(id2, pin)                                   # identity stayed put
         h1 = json.loads(rec1)["content_hash"]; h2 = json.loads(rec2)["content_hash"]

@@ -66,12 +66,13 @@ class MememageEncode:
                 "private": ("STRING", {"default": "",
                                        "tooltip": "Comma-separated top-level field names to encrypt. "
                                                   "Empty + a password = encrypt EVERY field."}),
-                "use_identifier": ("BOOLEAN", {"default": True,
-                                   "tooltip": "ON (default): honor the wired/typed identifier below. "
-                                              "OFF: ignore it — the record is content-addressed (a fresh "
-                                              "identity per change) EVEN IF a Reserve ID wire is connected. "
-                                              "Lets you leave a pin connected but toggle whether it actually "
-                                              "applies, instead of disconnecting the wire."}),
+                "use_identifier": ("BOOLEAN", {"default": False,
+                                   "tooltip": "OFF (default): content-address — a fresh identity per "
+                                              "change, ignoring the identifier below EVEN IF a Reserve ID "
+                                              "wire is connected. ON: honor the wired/typed identifier to "
+                                              "iterate ONE piece (each conceive overwrites the same record). "
+                                              "Lets you leave a pin connected but opt in to it deliberately, "
+                                              "instead of disconnecting the wire."}),
                 "identifier": ("STRING", {"default": "",
                                "tooltip": "Pin a reserved identifier (wire a Mememage Reserve ID node, "
                                           "or paste a <prefix>-<16 hex>) to keep iterating ONE piece — "
@@ -96,7 +97,7 @@ class MememageEncode:
         return float("nan")
 
     def run(self, image, fields=None, fields_json="{}", embed_workflow=True, prefix="mememage",
-            password_file="", private="", encrypt_workflow=False, use_identifier=True,
+            password_file="", private="", encrypt_workflow=False, use_identifier=False,
             identifier="", prompt=None):
         import mememage
         import copy

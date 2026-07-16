@@ -25,9 +25,10 @@ untouched). With one click, the bar can also point the image back at the
   fields** below.
 - `private` — comma-separated top-level field names to encrypt; empty + a
   password = encrypt everything.
-- `use_identifier` *(default on)* — honor the `identifier` below. Turn it **off** to
-  ignore the identifier (content-address as usual) *without disconnecting the wire* —
-  handy when a Reserve ID is wired in but you want a fresh identity for this one run.
+- `use_identifier` *(default off)* — off means content-address as usual (the natural
+  default), ignoring the `identifier` below even if a Reserve ID is wired in. Turn it
+  **on** to deliberately pin to that identifier — so you can leave a Reserve ID wired
+  and opt in only when you actually want to iterate one piece.
 - `identifier` — pin a reserved identifier (from **Mememage Reserve ID**, or paste a
   `<prefix>-<16 hex>`) to keep iterating **one** piece: each conceive overwrites the
   same record. Honored only when `use_identifier` is on. Empty = content-addressed
@@ -44,8 +45,9 @@ non-destructive workflow: you iterate. **Conceiving is the deliberate act** (run
 
 To keep refining **one** piece under a stable identity, drop a **Mememage Reserve ID**
 node — it mints a `<prefix>-<16 hex>` identifier once (the 🎲 button), saved with the
-workflow so it stays put — and wire it into Encode's `identifier`. Now the identifier
-is a fixed **pointer**; each conceive overwrites the same `<identifier>.json` while the
+workflow so it stays put — wire it into Encode's `identifier`, and turn on Encode's
+`use_identifier` (off by default, since content-addressing is the norm). Now the
+identifier is a fixed **pointer**; each conceive overwrites the same `<identifier>.json` while the
 content hash tracks what actually changed. Roll a new slot to start a fresh piece;
 paste an existing identifier to resume one from another session.
 
