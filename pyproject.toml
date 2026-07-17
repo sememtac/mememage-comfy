@@ -2,7 +2,7 @@
 # The ComfyUI-registry pack id (distinct from the core `mememage` PyPI library it
 # depends on). Users see the DisplayName ("Mememage") in ComfyUI Manager.
 name = "mememage-comfy"
-description = "Stamp a verifiable Mememage bar into generated images (and read it back) — the image carries a key to data you control, optionally its own ComfyUI prompt."
+description = "Stamp a verifiable Mememage bar into an image and read it back — the image carries a key to a record you build from your own fields (your generation data, a creator name, a license, anything you choose)."
 version = "0.4.1"
 license = { text = "MIT" }
 dependencies = ["mememage>=0.1.6", "certifi"]

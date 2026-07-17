@@ -5,8 +5,9 @@ memory, no disk round-trip.
 
 A 2-pixel-tall bar carries an **identifier** (a key to a record you store
 anywhere) and a **content hash** (proof the data belongs to this image,
-untouched). With one click, the bar can also point the image back at the
-**ComfyUI prompt that generated it**.
+untouched). The record is **whatever fields you choose** — your generation data,
+a creator name, a license, anything — and with one click it can also embed the
+full **ComfyUI workflow** that made the image.
 
 ## Nodes
 
