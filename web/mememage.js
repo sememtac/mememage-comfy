@@ -192,14 +192,20 @@ app.registerExtension({
   },
 });
 
-// Reserve ID: a stable identifier "pointer". Auto-fills a fresh <prefix>-<16 hex>
-// on drop (persisted with the workflow so it stays put across renders), plus a
-// 🎲 button to roll a new slot. Wire its output into Encode's `identifier`.
-function _randomIdentifier(prefix = "mememage") {
+// Reserve ID: a stable identifier "pointer". The user defines the `prefix`
+// (namespace); 🎲 randomizes only the 16-hex after it. `identifier` holds the full
+// <prefix>-<hex> (the output + paste target); the two stay in sync. Persisted with
+// the workflow so it stays put across renders. Wire the output into Encode's id.
+function _rollHex() {
   const bytes = new Uint8Array(8);
   (window.crypto || {}).getRandomValues?.(bytes);
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  return `${prefix}-${hex}`;
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+const _MM_HEX16 = /^[0-9a-f]{16}$/;
+function _splitIdentifier(id) {            // "phoenix-<16hex>" -> {pre:"phoenix", hex}
+  const i = (id || "").lastIndexOf("-");
+  if (i <= 0) return null;
+  return { pre: id.slice(0, i), hex: id.slice(i + 1) };
 }
 // Encrypt-workflow mirror: encrypting ANY field seals the embedded workflow, and
 // the toggle can't switch that off — a field typed into a node rides the graph as
@@ -272,18 +278,63 @@ app.registerExtension({
   name: "Mememage.ReserveId",
   async beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData?.name !== "MememageReserveId") return;
+
     const onCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
       onCreated?.apply(this, arguments);
       try {
-        const w = this.widgets?.find((x) => x.name === "identifier");
-        if (w && !w.value) { w.value = _randomIdentifier(); }   // fresh slot on first drop
+        const node = this;
+        const idW = _mmWidget(node, "identifier");
+        const preW = _mmWidget(node, "prefix");
+        if (!idW || !preW) return;
+
+        let syncing = false;                       // guard the two-way callbacks
+        const setW = (w, v) => { syncing = true; w.value = v; w.callback?.(v); syncing = false; };
+        const curPrefix = () => (String(preW.value ?? "").trim() || "mememage");
+
+        // initial state: empty identifier -> roll under the prefix; a pre-filled one
+        // (paste / older graph) -> adopt its prefix so the two agree
+        if (!idW.value) { setW(idW, `${curPrefix()}-${_rollHex()}`); }
+        else { const s = _splitIdentifier(idW.value); if (s) setW(preW, s.pre); }
+
+        // editing the namespace rewrites the identifier, keeping its hex (or a fresh one)
+        const prevPre = preW.callback;
+        preW.callback = function () {
+          const r = prevPre?.apply(this, arguments);
+          if (!syncing) {
+            const s = _splitIdentifier(idW.value);
+            const hex = (s && _MM_HEX16.test(s.hex)) ? s.hex : _rollHex();
+            setW(idW, `${curPrefix()}-${hex}`);
+            node.setDirtyCanvas(true, true);
+          }
+          return r;
+        };
+        // pasting a full identifier updates the namespace field to match
+        const prevId = idW.callback;
+        idW.callback = function () {
+          const r = prevId?.apply(this, arguments);
+          if (!syncing) { const s = _splitIdentifier(idW.value); if (s) setW(preW, s.pre); }
+          return r;
+        };
+
         const btn = this.addWidget("button", "🎲 new slot", null, () => {
-          const ww = this.widgets?.find((x) => x.name === "identifier");
-          if (ww) { ww.value = _randomIdentifier(); ww.callback?.(ww.value); this.setDirtyCanvas(true, true); }
+          setW(idW, `${curPrefix()}-${_rollHex()}`);   // roll hex under the CURRENT prefix
+          node.setDirtyCanvas(true, true);
         });
         btn.serialize = false;
       } catch (e) { console.error(`${TAG} reserve-id setup FAILED:`, e); }
+    };
+
+    // a saved graph restores widget values after creation — re-align the namespace
+    // field to whatever identifier came back, so the two don't show out of sync
+    const onConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function () {
+      onConfigure?.apply(this, arguments);
+      try {
+        const idW = _mmWidget(this, "identifier");
+        const preW = _mmWidget(this, "prefix");
+        if (idW && preW) { const s = _splitIdentifier(idW.value); if (s) preW.value = s.pre; }
+      } catch (e) { console.error(`${TAG} reserve-id onConfigure FAILED:`, e); }
     };
   },
 });

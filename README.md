@@ -212,10 +212,12 @@ reference decoder's password box) reveals them. Needs the crypto library:
   use **Mememage Decode** instead — this is the forensic reader.
 
 **Mememage Reserve ID** — `→ identifier`
-- A stable identifier **pointer** for iterating one piece. The **🎲 new slot** button
-  mints a fresh `<prefix>-<16 hex>` (saved with the workflow); wire the output into
-  Encode's `identifier` so every conceive overwrites the same record. Paste an existing
-  identifier to resume a piece. See **Iterating one piece** above.
+- A stable identifier **pointer** for iterating one piece. Set the **`prefix`** (your
+  namespace — match your chain's, e.g. `phoenix`); the **🎲 new slot** button randomizes
+  only the 16-hex after it, so your namespace sticks. The full `<prefix>-<16 hex>` is
+  saved with the workflow; wire it into Encode's `identifier` so every conceive overwrites
+  the same record. Paste an existing identifier to resume a piece (the prefix field syncs
+  to match). See **Iterating one piece** above.
 
 **Mememage Load Record** — `path → record, identifier`
 - The complement to Save Record: read **one** saved `.json` back from disk by full

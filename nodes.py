@@ -841,9 +841,14 @@ class MememageReserveId:
         return {
             "optional": {
                 "identifier": ("STRING", {"default": "",
-                               "tooltip": "A reserved <prefix>-<16 hex> identity. The 🎲 button fills "
-                                          "it; it's saved with the workflow so it stays stable as you "
-                                          "iterate. Wire the output into Encode's identifier."}),
+                               "tooltip": "The reserved <prefix>-<16 hex> identity (the output). The 🎲 "
+                                          "button rolls a fresh hex under the namespace below; paste a "
+                                          "full identifier here to resume a piece from another session. "
+                                          "Saved with the workflow so it stays stable as you iterate."}),
+                "prefix": ("STRING", {"default": "mememage",
+                            "tooltip": "The namespace (3-10 chars, IA-safe). You define it; 🎲 randomizes "
+                                       "only the hex after it. Match your chain's prefix. Editing it "
+                                       "rewrites the identifier above, keeping the same hex."}),
             }
         }
 
@@ -851,19 +856,22 @@ class MememageReserveId:
     RETURN_NAMES = ("identifier",)
     FUNCTION = "run"
     CATEGORY = "Mememage/Records"
-    DESCRIPTION = ("A reserved identifier — a stable pointer you keep iterating into. Wire into "
-                   "Encode's `identifier` so each conceive overwrites the same record.")
+    DESCRIPTION = ("A reserved identifier — a stable pointer you keep iterating into. Set the namespace, "
+                   "roll a slot, wire into Encode's `identifier` so each conceive overwrites the same record.")
 
     @classmethod
     def IS_CHANGED(cls, *args, **kwargs):
         return float("nan")                              # always emit the current slot value
 
-    def run(self, identifier=""):
+    def run(self, identifier="", prefix="mememage"):
+        # `prefix` is a UX driver for the 🎲 roll (the JS keeps `identifier` in sync
+        # under it); the identifier is authoritative and is what's emitted/wired.
         ident = (identifier or "").strip()
         if ident and not _is_canonical_identifier(ident):
             raise ValueError(
                 f"Mememage Reserve ID: {ident!r} isn't a canonical <prefix>-<16 hex> identifier. "
-                "Use the 🎲 button to generate one, or paste a valid one (e.g. mememage-1a2b3c4d5e6f7a8b).")
+                "Set the namespace and use the 🎲 button, or paste a valid one "
+                "(e.g. mememage-1a2b3c4d5e6f7a8b). The prefix must be 3-10 chars.")
         return (ident,)
 
 
