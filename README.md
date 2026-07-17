@@ -66,27 +66,47 @@ reference decoder's password box) reveals them. Needs the crypto library:
 > **Read this before you rely on it.** ComfyUI, by default, bakes the *entire
 > workflow graph* into every saved PNG's metadata (a `prompt` + `workflow` text
 > chunk). That means anything on the graph — and the **plaintext of any field
-> you're hiding**, if it's entered via graph nodes — gets embedded in the very
-> image you share. That's why the password is file/env only (it never touches the
-> graph). It's also why **encrypting any field automatically seals the embedded
+> you're hiding**, if it's entered via graph nodes — gets embedded in the saved
+> PNG file itself (see **Scope** below for how far that actually travels). That's
+> why the password is file/env only (it never touches the graph). It's also why **encrypting any field automatically seals the embedded
 > workflow**: `comfy_prompt` mirrors the graph's widget values, so publishing it
 > beside your ciphertext would hand over the very thing you just encrypted. Privacy
 > wins over a shareable recipe whenever the two collide — `encrypt_workflow` is kept
 > as an explicit belt-and-braces, but it can't switch the sealing off, and on its own
 > it's a no-op (with no `private` list, a password already encrypts every field,
 > workflow included). **To seal only the recipe and keep your other fields public,
-> name `comfy_prompt` in `private`.** To keep encrypted fields actually secret in a
-> shared image:
-> 1. **Run ComfyUI with `--disable-metadata`** so the graph isn't written into the PNG.
-> 2. **Provide the password via `password_file` or `MEMEMAGE_PASSWORD`** — never on
->    the graph. Resolution order: `password_file` → env var.
+> name `comfy_prompt` in `private`.**
 >
 > The record `.json` is safe on its own: `encrypted_fields` is ciphertext, the
-> workflow is sealed with it, and the node never writes the password into it. **The
-> PNG is the part that still leaks** — Mememage doesn't save your image, ComfyUI's
-> SaveImage does, and it writes the graph into the file regardless of what we
-> encrypt. Step 1 is the only thing that closes that. If a secret was typed into a
-> node widget, treat the PNG as carrying it in the clear until you disable metadata.
+> workflow is sealed with it, and the node never writes the password into it. What
+> the record encryption **cannot** reach is ComfyUI's own PNG metadata — Mememage
+> hands the saver an image tensor (no metadata), then the saver writes the graph
+> into the file, and if a secret was typed into a node widget its plaintext rides
+> along. **Two savers, two outcomes:**
+> - **Mememage Save Record** (wire Encode's `image` into it) writes the barred PNG
+>   with **no metadata at all** — clean. This is the private-safe save path.
+> - ComfyUI's stock **SaveImage** bakes the whole graph (a `prompt` + `workflow`
+>   chunk) into the PNG, so a widget-entered secret sits there in the clear.
+>
+> **Scope of the exposure — read this before you panic *or* dismiss it.** The leak
+> is the **local file at rest only.** PNG text chunks are stripped by every
+> re-encoding platform (Discord, Instagram, X) and by Mememage's own travel
+> surfaces (the bar, the watermark, and the uploaded soul record are all encrypted
+> and carry nothing) — so a re-shared or re-uploaded copy does **not** carry the
+> secret. What *does* carry it is the raw file itself: an email attachment, a
+> "send as file", a folder synced to a cloud drive, a project handed to a
+> collaborator. Whether that matters is your call to make — but make it *informed*.
+>
+> To keep the local file clean, any one of:
+> 1. **Save through Mememage Save Record** instead of stock SaveImage (simplest — no
+>    launch flags, and you were probably saving the record anyway).
+> 2. **Run ComfyUI with `--disable-metadata`** if you insist on stock SaveImage.
+> 3. **Don't type secrets into graph widgets** — a value that never touches the
+>    graph can't be baked into the PNG regardless of saver.
+>
+> And always: **provide the password via `password_file` or `MEMEMAGE_PASSWORD`**,
+> never a widget (resolution order: `password_file` → env var). The password is the
+> one secret that never rides the graph, by design.
 
 **Mememage JSON** — `→ fields`
 - **Bring an existing JSON object in as fields.** For when you *already have* the
