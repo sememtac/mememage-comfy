@@ -201,6 +201,73 @@ function _randomIdentifier(prefix = "mememage") {
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   return `${prefix}-${hex}`;
 }
+// Encrypt-workflow mirror: encrypting ANY field seals the embedded workflow, and
+// the toggle can't switch that off — a field typed into a node rides the graph as
+// a widget value, so publishing comfy_prompt beside its own ciphertext would hand
+// back the very thing you encrypted. A switch reading OFF while sealing happens is
+// a lie, so mirror the truth: `private` names a field -> force it on and grey it
+// out; `private` empty -> a live switch again (a no-op either way — with no private
+// list a password already encrypts every field, the graph included).
+//
+// Cosmetic only. Python is authoritative and seals regardless; if this extension
+// fails to load the toggle just sits there inert, exactly as it did before.
+const _mmWidget = (node, name) => (node.widgets || []).find((w) => w.name === name);
+const _MM_FORCED_TIP = "Forced on: encrypting a field always seals the embedded workflow, "
+                     + "because the graph carries that field's plaintext.";
+
+function syncEncryptWorkflow(node) {
+  const priv = _mmWidget(node, "private");
+  const enc = _mmWidget(node, "encrypt_workflow");
+  if (!priv || !enc) return;                       // widgets converted to inputs — nothing to mirror
+  if (enc._mmTip === undefined) enc._mmTip = enc.tooltip;   // keep Python's wording to restore
+  const sealing = String(priv.value ?? "").trim().length > 0;
+  if (sealing) {
+    if (!enc.disabled) node._mmUserEncWf = enc.value;       // remember the user's own choice
+    enc.value = true;
+    enc.disabled = true;
+    enc.tooltip = _MM_FORCED_TIP;
+  } else {
+    if (enc.disabled && node._mmUserEncWf !== undefined) enc.value = node._mmUserEncWf;
+    enc.disabled = false;
+    enc.tooltip = enc._mmTip;
+  }
+  node.setDirtyCanvas(true, true);
+}
+
+app.registerExtension({
+  name: "Mememage.EncryptWorkflowMirror",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData?.name !== "MememageEncode") return;
+
+    const onCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      onCreated?.apply(this, arguments);
+      try {
+        const node = this;
+        const priv = _mmWidget(node, "private");
+        if (priv) {                                 // re-mirror whenever `private` changes
+          const prev = priv.callback;
+          priv.callback = function () {
+            const r = prev?.apply(this, arguments);
+            try { syncEncryptWorkflow(node); } catch (e) { console.error(`${TAG} mirror FAILED:`, e); }
+            return r;
+          };
+        }
+        syncEncryptWorkflow(node);
+      } catch (e) { console.error(`${TAG} encrypt-workflow mirror setup FAILED:`, e); }
+    };
+
+    // A saved graph restores widget values AFTER onNodeCreated — mirror again once
+    // `private` actually holds what the user saved, or a reloaded sealing graph
+    // would come back showing an un-forced toggle.
+    const onConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function () {
+      onConfigure?.apply(this, arguments);
+      try { syncEncryptWorkflow(this); } catch (e) { console.error(`${TAG} mirror onConfigure FAILED:`, e); }
+    };
+  },
+});
+
 app.registerExtension({
   name: "Mememage.ReserveId",
   async beforeRegisterNodeDef(nodeType, nodeData) {
