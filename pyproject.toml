@@ -3,7 +3,7 @@
 # depends on). Users see the DisplayName ("Mememage") in ComfyUI Manager.
 name = "mememage-comfy"
 description = "Stamp a verifiable Mememage bar into generated images (and read it back) — the image carries a key to data you control, optionally its own ComfyUI prompt."
-version = "0.4.0"
+version = "0.4.1"
 license = { text = "MIT" }
 dependencies = ["mememage>=0.1.6", "certifi"]
 
