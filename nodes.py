@@ -47,14 +47,18 @@ class MememageEncode:
                 "fields_json": ("STRING", {"multiline": True, "default": "{}"}),
                 "prefix": ("STRING", {"default": "mememage"}),
                 # workflow group — keep these two together
-                "embed_workflow": ("BOOLEAN", {"default": True}),
+                "embed_workflow": ("BOOLEAN", {"default": True,
+                                   "tooltip": "Embed the generating graph in the record as comfy_prompt. "
+                                              "When you also encrypt fields, the graph is sealed with "
+                                              "them — its widget values ARE those fields' plaintext."}),
                 "encrypt_workflow": ("BOOLEAN", {"default": False,
-                                     "tooltip": "Also encrypt the embedded workflow (comfy_prompt) when "
-                                                "you're encrypting SELECT fields. Off keeps your recipe "
-                                                "shareable. Turn ON if the fields you're hiding were "
-                                                "entered via graph nodes — their values live in the "
-                                                "workflow, so this seals them too. (Encrypt-everything "
-                                                "already covers the workflow.)"}),
+                                     "tooltip": "Seal the embedded workflow (comfy_prompt) too. Encrypting "
+                                                "ANY field now does this automatically — the graph carries "
+                                                "that field's plaintext — so this is belt-and-braces there. "
+                                                "On its own it's a no-op: with no `private` list, a password "
+                                                "already encrypts every field including the workflow. To "
+                                                "seal ONLY the recipe and keep your other fields public, "
+                                                "put `comfy_prompt` in `private` instead."}),
                 # encryption group
                 "password_file": ("STRING", {"default": "",
                                              "tooltip": "To encrypt, put your passphrase in a file and "
@@ -65,7 +69,9 @@ class MememageEncode:
                                                         "mememage[encrypt]."}),
                 "private": ("STRING", {"default": "",
                                        "tooltip": "Comma-separated top-level field names to encrypt. "
-                                                  "Empty + a password = encrypt EVERY field."}),
+                                                  "Empty + a password = encrypt EVERY field. Encrypting "
+                                                  "anything also seals the embedded workflow, which would "
+                                                  "otherwise carry those fields' plaintext."}),
                 "use_identifier": ("BOOLEAN", {"default": False,
                                    "tooltip": "OFF (default): content-address — a fresh identity per "
                                               "change, ignoring the identifier below EVEN IF a Reserve ID "
@@ -156,12 +162,17 @@ class MememageEncode:
                 f"Point password_file at a file holding your passphrase (the 📁 button), or set the "
                 f"MEMEMAGE_PASSWORD env var. (Or clear `private` to make a fully public record.)")
 
-        # Opt-in: also seal the embedded workflow when encrypting SELECT fields.
-        # comfy_prompt captures the whole graph, including the plaintext of fields you
-        # encrypt (their values ride the graph), so encrypt_workflow keeps them from
-        # leaking through it. Off by default — the recipe stays shareable, the user's
-        # informed choice. (Encrypt-everything, priv is None, already covers the graph.)
-        if encrypt_workflow and pw is not None and priv is not None \
+        # Encrypting SELECT fields ALWAYS seals the embedded workflow too — privacy
+        # first, not a choice. comfy_prompt captures the whole graph, and a field you
+        # typed into a node lives there as a widget value, so publishing it beside its
+        # own ciphertext would encrypt the field and leak it in the same record. This
+        # used to be gated on the encrypt_workflow toggle, whose off-by-default
+        # silently undid the user's stated intent. The toggle survives as an explicit
+        # belt-and-braces (and to keep saved graphs' widget slots aligned), but it can
+        # no longer switch the sealing OFF. It does nothing on its own: with no `private`
+        # list a password already encrypts every field, the graph included — to seal only
+        # the recipe, name comfy_prompt in `private`.
+        if pw is not None and priv is not None \
                 and "comfy_prompt" in fields and "comfy_prompt" not in priv:
             priv = priv + ["comfy_prompt"]
 

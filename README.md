@@ -68,21 +68,25 @@ reference decoder's password box) reveals them. Needs the crypto library:
 > chunk). That means anything on the graph — and the **plaintext of any field
 > you're hiding**, if it's entered via graph nodes — gets embedded in the very
 > image you share. That's why the password is file/env only (it never touches the
-> graph). It's also why, when you encrypt select fields whose values came from graph
-> nodes, you'll usually want **`encrypt_workflow`** on: the embedded `comfy_prompt`
-> mirrors those values, so sealing it stops them leaking. It's **opt-in** (off by
-> default) so your recipe stays shareable when that's what you want — a deliberate
-> choice, not a silent one. (Encrypt-everything already covers the workflow.) To keep
-> encrypted fields actually secret in a shared image:
+> graph). It's also why **encrypting any field automatically seals the embedded
+> workflow**: `comfy_prompt` mirrors the graph's widget values, so publishing it
+> beside your ciphertext would hand over the very thing you just encrypted. Privacy
+> wins over a shareable recipe whenever the two collide — `encrypt_workflow` is kept
+> as an explicit belt-and-braces, but it can't switch the sealing off, and on its own
+> it's a no-op (with no `private` list, a password already encrypts every field,
+> workflow included). **To seal only the recipe and keep your other fields public,
+> name `comfy_prompt` in `private`.** To keep encrypted fields actually secret in a
+> shared image:
 > 1. **Run ComfyUI with `--disable-metadata`** so the graph isn't written into the PNG.
 > 2. **Provide the password via `password_file` or `MEMEMAGE_PASSWORD`** — never on
 >    the graph. Resolution order: `password_file` → env var.
-> 3. **Turn on `encrypt_workflow`** if the fields you're hiding were entered via graph
->    nodes (so `comfy_prompt` doesn't carry their plaintext).
 >
-> The record `.json` itself is always safe — `encrypted_fields` is ciphertext, and
-> the node never writes the password into it. The leak is purely ComfyUI's own PNG
-> metadata; the two steps above close it.
+> The record `.json` is safe on its own: `encrypted_fields` is ciphertext, the
+> workflow is sealed with it, and the node never writes the password into it. **The
+> PNG is the part that still leaks** — Mememage doesn't save your image, ComfyUI's
+> SaveImage does, and it writes the graph into the file regardless of what we
+> encrypt. Step 1 is the only thing that closes that. If a secret was typed into a
+> node widget, treat the PNG as carrying it in the clear until you disable metadata.
 
 **Mememage JSON** — `→ fields`
 - **Bring an existing JSON object in as fields.** For when you *already have* the

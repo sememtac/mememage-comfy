@@ -893,22 +893,22 @@ class TestEncryption(unittest.TestCase):
         pil = nodes._tensor_to_pil(barred[0], np, Image)
         self.assertTrue(mememage.verify(pil, json.loads(rec)))   # proof over the ciphertext shell
 
-    def test_workflow_stays_public_by_default(self):
-        # separation of concerns: selective encryption leaves comfy_prompt public
-        # unless the user opts in.
+    def test_private_field_plaintext_never_rides_the_workflow(self):
+        # THE leak this coupling exists to close: a field typed into a graph node is a
+        # widget value, so encrypting the field while publishing comfy_prompt would
+        # seal it and hand over the plaintext in the same record.
         import torch, os
         from unittest.mock import patch
         img = torch.full((1, 512, 512, 3), 0.5)
-        graph = {"11": {"class_type": "TextNode", "inputs": {"value": "v"}}}
+        graph = {"11": {"class_type": "MememageField",
+                        "inputs": {"name": "secret", "value": "ATTACK AT DAWN"}}}
         with patch.dict(os.environ, {"MEMEMAGE_PASSWORD": "pw"}, clear=False):
             _, _, rec = nodes.MememageEncode().run(
-                img, fields_json='{"secret": "x"}', private="secret",
-                embed_workflow=True, prompt=graph)   # encrypt_workflow defaults False
-        r = json.loads(rec)
-        self.assertIn("comfy_prompt", r)             # recipe stays shareable
-        self.assertNotIn("secret", r)                # the field is still encrypted
+                img, fields_json='{"secret": "ATTACK AT DAWN"}', private="secret",
+                embed_workflow=True, prompt=graph)
+        self.assertNotIn("ATTACK AT DAWN", rec)      # nowhere in the record, at all
 
-    def test_encrypt_workflow_opt_in_seals_it(self):
+    def test_private_seals_the_workflow_with_no_toggle(self):
         import torch, os, mememage
         from unittest.mock import patch
         img = torch.full((1, 512, 512, 3), 0.5)
@@ -916,12 +916,33 @@ class TestEncryption(unittest.TestCase):
         with patch.dict(os.environ, {"MEMEMAGE_PASSWORD": "pw"}, clear=False):
             _, _, rec = nodes.MememageEncode().run(
                 img, fields_json='{"secret": "x", "pub": "ok"}', private="secret",
-                embed_workflow=True, encrypt_workflow=True, prompt=graph)
+                embed_workflow=True, prompt=graph)
         r = json.loads(rec)
-        self.assertNotIn("comfy_prompt", r)          # opted in -> sealed
+        self.assertNotIn("comfy_prompt", r)          # sealed by `private` alone
         self.assertNotIn("secret", r)
         self.assertEqual(r.get("pub"), "ok")         # unrelated public field stays public
         self.assertIn("comfy_prompt", mememage.unlock(r, "pw"))   # recoverable
+
+    def test_retired_encrypt_workflow_kwarg_cannot_reopen_the_leak(self):
+        # a graph saved with the old toggle OFF must not resurrect the leak
+        import torch, os
+        from unittest.mock import patch
+        img = torch.full((1, 512, 512, 3), 0.5)
+        graph = {"11": {"class_type": "TextNode", "inputs": {"value": "v"}}}
+        with patch.dict(os.environ, {"MEMEMAGE_PASSWORD": "pw"}, clear=False):
+            _, _, rec = nodes.MememageEncode().run(
+                img, fields_json='{"secret": "x"}', private="secret",
+                embed_workflow=True, encrypt_workflow=False, prompt=graph)
+        self.assertNotIn("comfy_prompt", json.loads(rec))
+
+    def test_public_record_still_embeds_the_workflow(self):
+        # no encryption -> the recipe stays shareable, unchanged behavior
+        import torch
+        img = torch.full((1, 512, 512, 3), 0.5)
+        graph = {"11": {"class_type": "TextNode", "inputs": {"value": "v"}}}
+        _, _, rec = nodes.MememageEncode().run(
+            img, fields_json='{"pub": "ok"}', embed_workflow=True, prompt=graph)
+        self.assertIn("comfy_prompt", json.loads(rec))
 
 
 class TestFetchRecord(unittest.TestCase):
