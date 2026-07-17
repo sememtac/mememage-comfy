@@ -780,6 +780,49 @@ class MememageDecode:
         return (bar.identifier, bar.content_hash, image)
 
 
+class MememageDecodeAll:
+    """Read EVERY Mememage bar in an image — for composites that carry more than one.
+
+    The plain **Mememage Decode** reads the single bottom bar (the common case: one
+    image, one record). This reads them all: an image assembled from several barred
+    pictures (a collage, a contact sheet, a paste-up) carries a bar per source, at
+    whatever height each sits. A forensic reader — "what provenanced images are in
+    here" — closer in spirit to the validator's Observatory than to the mint pipeline.
+
+    `identifiers` and `content_hashes` are LIST outputs (bottom-most bar first, index-
+    aligned), so wiring either into Load Record / Verify makes that node **run once
+    per bar automatically** — no loop node. `count` is the plain number found (0 when
+    the image has no bar), handy to gate on. The image passes through unchanged.
+
+    A false positive would have to beat the magic bytes, CRC-16, and Reed-Solomon at
+    once, so bar-ish noise is dropped, not misread. Reads the first image of a batch,
+    same as Decode.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"image": ("IMAGE",)}}
+
+    RETURN_TYPES = ("STRING", "STRING", "INT", "IMAGE")
+    RETURN_NAMES = ("identifiers", "content_hashes", "count", "image")
+    OUTPUT_IS_LIST = (True, True, False, False)        # ids + hashes fan out; count + image are scalar
+    FUNCTION = "run"
+    CATEGORY = "Mememage"
+    DESCRIPTION = ("Read every Mememage bar in an image (for composites). identifiers + "
+                   "content_hashes are lists that fan out to Load Record / Verify; count is "
+                   "how many were found.")
+
+    def run(self, image):
+        import mememage
+        np, torch, Image = _deps()
+        pil = _tensor_to_pil(image[0], np, Image)
+
+        bars = mememage.decode(pil, all_bars=True)     # list of Bar, bottom-most first
+        identifiers = [b.identifier for b in bars]
+        content_hashes = [b.content_hash for b in bars]
+        return (identifiers, content_hashes, len(bars), image)
+
+
 class MememageReserveId:
     """A reserved identifier — a stable pointer you keep pointing at new versions.
 
@@ -1476,6 +1519,7 @@ NODE_CLASS_MAPPINGS = {
     "MememageField": MememageField,
     "MememageFieldList": MememageFieldList,
     "MememageDecode": MememageDecode,
+    "MememageDecodeAll": MememageDecodeAll,
     "MememageLoadRecord": MememageLoadRecord,
     "MememageFindRecord": MememageFindRecord,
     "MememageFetchRecord": MememageFetchRecord,
@@ -1493,6 +1537,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MememageField": "Mememage Field",
     "MememageFieldList": "Mememage Fields",          # friendly name — "the node your fields go into"
     "MememageDecode": "Mememage Decode",
+    "MememageDecodeAll": "Mememage Decode All",
     "MememageLoadRecord": "Mememage Load Record",
     "MememageFindRecord": "Mememage Find Record",
     "MememageFetchRecord": "Mememage Fetch Record",

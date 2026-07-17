@@ -384,6 +384,47 @@ class TestRoundTrip(unittest.TestCase):
         _, matched, _, _ = nodes.MememageVerify().run(image=barred, record=record)
         self.assertTrue(matched)
 
+    def test_decode_all_finds_every_bar(self):
+        import torch
+        from mememage.bar import embed_into
+        from PIL import Image
+        np, _t, _I = nodes._deps()
+
+        # a genuine 2-bar composite: bar one, push it up by appending rows, stamp a
+        # second at the new bottom (mirrors core's own multi-bar test construction)
+        one = embed_into(Image.new("RGB", (480, 300), (90, 90, 90)),
+                         "mememage-aa8194d91f1da238", "47f11bad5dcc9ad2")
+        w, h = one.size
+        moved = Image.new("RGB", (w, h + 40), (70, 70, 70)); moved.paste(one, (0, 0))
+        two = embed_into(moved, "mememage-deadbeefcafe1234", "0011223344556677")
+
+        tensor = torch.from_numpy(nodes._pil_to_array(two, np))[None, ...]
+        ids, hashes, count, img_out = nodes.MememageDecodeAll().run(tensor)
+        self.assertEqual(count, 2)
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(set(ids), {"mememage-aa8194d91f1da238", "mememage-deadbeefcafe1234"})
+        self.assertEqual(len(hashes), 2)
+        self.assertEqual(img_out.shape, tensor.shape)          # image chains onward
+
+    def test_decode_all_empty_image_is_zero_not_crash(self):
+        import torch
+        img = torch.full((1, 128, 128, 3), 0.5)                # no bar
+        ids, hashes, count, img_out = nodes.MememageDecodeAll().run(img)
+        self.assertEqual(count, 0)
+        self.assertEqual(ids, [])
+        self.assertEqual(hashes, [])
+        self.assertEqual(img_out.shape, img.shape)
+
+    def test_decode_all_single_bar_returns_one(self):
+        import torch
+        img = torch.full((1, 512, 768, 3), 0.5)
+        barred, identifier, _ = nodes.MememageEncode().run(
+            img, fields_json='{"by": "catmemes"}', embed_workflow=False)
+        ids, hashes, count, _out = nodes.MememageDecodeAll().run(barred)
+        self.assertEqual(count, 1)
+        self.assertEqual(ids, [identifier])
+        self.assertEqual(len(hashes), 1)
+
     def test_record_core_fields_first_and_still_verifies(self):
         import torch
         img = torch.full((1, 512, 512, 3), 0.5)

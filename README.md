@@ -203,6 +203,14 @@ reference decoder's password box) reveals them. Needs the crypto library:
   look the record up (e.g. Load Record). To check whether an image *matches* its
   record, use **Mememage Verify** — that's the verification node.
 
+**Mememage Decode All** — `IMAGE → identifiers[], content_hashes[], count, image`
+- Reads **every** bar in a composite (a collage/contact sheet assembled from several
+  barred images carries one bar each). `identifiers` and `content_hashes` are **list**
+  outputs — wire either into **Load Record** or **Verify** and that node runs **once per
+  bar** automatically (ComfyUI list-expansion), no loop node. `count` is how many were
+  found (0 for a bare image), handy to gate on. For the ordinary one-image-one-bar case
+  use **Mememage Decode** instead — this is the forensic reader.
+
 **Mememage Reserve ID** — `→ identifier`
 - A stable identifier **pointer** for iterating one piece. The **🎲 new slot** button
   mints a fresh `<prefix>-<16 hex>` (saved with the workflow); wire the output into
